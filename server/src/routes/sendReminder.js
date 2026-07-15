@@ -1,6 +1,6 @@
 import { Router } from 'express';
-// Note: the actual email send/formatting is performed by the background worker
 import { queue } from '../workers/emailQueue.js';
+import { reminderLimiter } from '../middleware/rateLimiter.js';
 
 export const sendReminderRouter = Router();
 
@@ -25,7 +25,7 @@ function respondWithError(res, err, defaultStatus = 500) {
   return res.status(status).json({ error: message });
 }
 
-sendReminderRouter.post('/send-reminder', async (req, res) => {
+sendReminderRouter.post('/send-reminder', reminderLimiter, async (req, res) => {
   try {
     const { invoice } = req.body;
     validateInvoice(invoice);
@@ -37,7 +37,7 @@ sendReminderRouter.post('/send-reminder', async (req, res) => {
       );
     }
 
-    // Enqueue work to the email worker instead of sending inline
+    // BullMQ job creation logic goes here
     await queue.add('send-reminder', { invoice });
 
     return res.status(202).json({

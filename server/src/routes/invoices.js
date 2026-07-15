@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../utils/db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { validate, createInvoiceSchema } from '../middleware/validate.js';
 
 const router = express.Router();
 
@@ -162,9 +163,9 @@ router.get('/invoices', async (_req, res, next) => {
  *       401:
  *         description: Unauthorized - missing or invalid token
  */
-router.post('/invoices', requireAuth, async (req, res, next) => {
+router.post('/invoices', requireAuth, validate(createInvoiceSchema), async (req, res, next) => {
   try {
-    const body = req.body || {};
+    const body = req.validated.body;
     const reminderHistory = body.reminderHistory || [];
     
     // 🔥 FIX: We removed 'id' from the INSERT and VALUES lists so Postgres handles it automatically!
