@@ -1,6 +1,6 @@
 # PayRemind — Payment Reminder System
 
-A lightweight monorepo for tracking invoices and sending payment reminder emails via [Resend](https://resend.com). Invoice data lives in **localStorage** on the client; the Express server acts only as a secure proxy so your API key never reaches the browser.
+A lightweight monorepo for tracking invoices and sending payment reminder emails via [Resend](https://resend.com). The app uses an Express API backed by PostgreSQL, with JWT authentication protecting invoice operations and a BullMQ worker for background email delivery.
 
 ## Project structure
 
@@ -12,6 +12,8 @@ A lightweight monorepo for tracking invoices and sending payment reminder emails
 ## Prerequisites
 
 - Node.js 18+
+- PostgreSQL
+- Redis
 - A [Resend](https://resend.com) API key
 
 ## Setup
@@ -36,6 +38,7 @@ cd server
 npm install
 cp .env.example .env
 # Edit .env — see Environment variables below
+# Make sure DATABASE_URL, JWT_SECRET, REDIS_URL, and Resend credentials are configured
 npm run dev
 ```
 
@@ -57,6 +60,9 @@ Open **http://localhost:5173**. Vite proxies `/api/*` to `http://localhost:3000`
 
 | Variable | Description |
 |----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string used by the server. |
+| `JWT_SECRET` | Secret key for signing JWT tokens used by authenticated invoice routes. |
+| `REDIS_URL` | Redis connection string used by BullMQ for the email queue. |
 | `RESEND_API_KEY` | Your Resend API key from [resend.com/api-keys](https://resend.com/api-keys) (server only). Must start with `re_` — not a placeholder. |
 | `RESEND_FROM_EMAIL` | Verified sender (default: `onboarding@resend.dev`) |
 | `REMINDER_TO_EMAIL` | **Sandbox recipient** — on the Resend free tier, all reminder emails are sent to this verified address instead of each invoice’s `clientEmail` |
@@ -87,18 +93,24 @@ Open **http://localhost:5173**. Vite proxies `/api/*` to `http://localhost:3000`
 
 ### API / email
 
-- Resend `emails.send()` wrapped in try/catch with full errors logged to the server terminal
-- Failed sends return `{ error: "..." }` with `400`/`500` status (no server crash)
-- Frontend toasts display the API error message when available
+ - Express API backed by PostgreSQL with normalized relational tables for invoices and reminder history
+- JWT authentication with bcrypt password hashing secures API access and invoice mutation routes
+- Swagger auto-generates interactive OpenAPI docs via `swagger-jsdoc` and `swagger-ui-express`
+- `POST /api/send-reminder` is rate-limited and enqueues a BullMQ job to Redis for asynchronous email delivery
+- Email payloads are sanitized using a custom `escapeHtml` utility before rendering backend HTML templates
+- Request payloads are validated server-side with Zod middleware, rejecting invalid invoices before database writes
+- Resend email errors are caught and surfaced cleanly; responses return `{ error: "..." }` with appropriate HTTP status codes
+- Frontend toasts display API error messages when available
 
 ## Data layer
 
-See `client/src/utils/store.js`.
+The server now persists invoices in PostgreSQL, including a normalized reminder history relationship rather than flat client-side arrays.
 
-- `loadInvoices` / `saveInvoices` — localStorage persistence
-- `computeCurrencyTotals(invoices, currency)` — amounts and counts (`total`, `paidCount`, `unpaidCount`, `overdueCount`) for the active currency tab
+- Invoices are stored in PostgreSQL and fetched through the Express API
+- Reminder history is modeled as a separate relational table with foreign keys
+- All invoice writes are validated before database insertion using Zod
 
-Swap persistence for API calls when you add a real database.
+The client still renders data locally, but the backend is responsible for durable storage and normalized relational modeling.
 
 ## Scripts
 
