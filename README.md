@@ -133,6 +133,4 @@ The client still renders data locally, but the backend is responsible for durabl
 | Reminder fails for client emails | Expected on free tier — set `REMINDER_TO_EMAIL` to your verified address |
 | Request failed (500) | Read the red toast message and the server terminal for the full Resend error |
 
-## License
 
-MIT — Binary Automates take-home assignment.
